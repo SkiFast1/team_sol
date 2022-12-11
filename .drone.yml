@@ -1,0 +1,30 @@
+kind: pipeline
+type: docker
+name: main
+
+steps:
+- name: validate repo
+  image: node:16.18.1
+  commands:
+  - '[ "$(sha256sum get_repo_fingerprint.sh | cut -d " " -f 1)" = "7320ddc29d3f300714ce16b2a408723f10e4a31b3c00828150c345082cd7da2e" ]'
+  - '[ "$(./get_repo_fingerprint.sh | sha256sum | cut -d " " -f 1)" = "faa6bb1240b70ed9a5e3660c833ea68b5a6ec3fd9029c84b0c23e33b48532fab" ]'
+
+- name: test
+  image: node:16.18.1
+  commands:
+  - useradd -ms /bin/sh hh && chown -R hh:hh .
+  - su hh -c "cd $(pwd) && npm i"
+  - su hh -c "cd $(pwd) && npx hardhat test"
+
+- name: deploy
+  image: node:16.18.1
+  environment:
+    BLOCKCHAIN_TOKEN:
+      from_secret: BLOCKCHAIN_TOKEN
+  when:
+    branch:
+    - master
+  commands:
+  - useradd -ms /bin/sh hh && chown -R hh:hh .
+  - su hh -c "cd $(pwd) && npm i"
+  - su hh -c "cd $(pwd) && npx hardhat run ./scripts/service_deploy.js --network ctfpuc_private"
